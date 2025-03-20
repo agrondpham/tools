@@ -39,24 +39,36 @@ EOF
 # Copy server files
 cp pki/ca.crt pki/private/server.key pki/issued/server.crt pki/dh.pem /etc/openvpn/server/
 
+openvpn --genkey secret /etc/openvpn/server/ta.key
+
 # Create server config
 cat > /etc/openvpn/server/server.conf <<EOF
 port 1194
-proto udp
+proto udp4
 dev tun
 ca ca.crt
 cert server.crt
 key server.key
 dh dh.pem
+topology subnet
 server 10.8.0.0 255.255.255.0
 ifconfig-pool-persist ipp.txt
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 208.67.222.222"
+push "dhcp-option DNS 192.168.1.1"
+client-to-client
 keepalive 10 120
-tls-auth ta.key 0
+#tls-auth ta.key 0
 cipher AES-256-CBC
+comp-lzo
 persist-key
 persist-tun
 status openvpn-status.log
+log-append openvpn.log
 verb 3
+auth SHA512
+explicit-exit-notify 1
+auth SHA512
 EOF
 
 # Enable IP forwarding
@@ -78,15 +90,18 @@ for client in client1 client2; do
     cat > ~/openvpn-clients/$client/$client.ovpn <<EOF
 client
 dev tun
-proto udp
-remote YOUR_SERVER_IP 1194
+proto udp4
+remote 118.71.175.107 1194
 resolv-retry infinite
 nobind
 persist-key
 persist-tun
 remote-cert-tls server
 cipher AES-256-CBC
+auth SHA512
+comp-lzo
 verb 3
+key-direction 1
 <ca>
 $(cat ~/openvpn-ca/pki/ca.crt)
 </ca>
@@ -100,4 +115,4 @@ EOF
 
 done
 
-echo "OpenVPN installation and client setup completed. Client configs are in ~/openvpn-clients/"
+echo "OpenVPN installation and client setup completed. Client configs are in ~/openvpn-clients/. and set iptable with command 'iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE' eth0 is network using "
